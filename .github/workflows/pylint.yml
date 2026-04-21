@@ -1,4 +1,4 @@
-name: Code Quality Check
+name: Pylint Code Quality
 
 on:
   push:
@@ -8,10 +8,6 @@ jobs:
   lint:
     runs-on: ubuntu-latest
 
-    strategy:
-      matrix:
-        python-version: ["3.10"]   # keep one version for speed
-
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
@@ -19,7 +15,7 @@ jobs:
     - name: Setup Python
       uses: actions/setup-python@v5
       with:
-        python-version: ${{ matrix.python-version }}
+        python-version: "3.10"
 
     - name: Install dependencies
       run: |
@@ -28,4 +24,17 @@ jobs:
 
     - name: Run pylint and show score
       run: |
-        pylint $(git ls-files '*.py') --exit-zero --score=y
+        pylint $(git ls-files '*.py') --score=y | tee pylint-report.txt
+        echo "------ FINAL SCORE ------"
+        grep "rated at" pylint-report.txt
+
+    - name: Fail if score is low
+      run: |
+        SCORE=$(grep -oP 'rated at \K[0-9.]+' pylint-report.txt)
+        echo "Score is $SCORE"
+        MIN_SCORE=8.0
+
+        awk "BEGIN {exit !($SCORE < $MIN_SCORE)}" && {
+          echo "❌ Code quality below $MIN_SCORE"
+          exit 1
+        } || echo "✅ Code quality is acceptable"
